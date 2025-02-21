@@ -20,7 +20,7 @@ services:
       POSTGRES_PASSWORD: your_password
       POSTGRES_DB: your_dbname
     ports:
-      - "${EXTERNAL_PORT_DB}::5432"
+      - "${EXTERNAL_PORT_DB}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -32,6 +32,12 @@ services:
     env_file:
       - .env
     command: [ "python", "-m", "rabbit.consumer" ]
+    networks:
+      - message-broker
 
 volumes:
   postgres_data:
+
+networks:
+  message-broker:
+    external: true

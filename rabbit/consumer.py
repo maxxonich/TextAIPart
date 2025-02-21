@@ -12,7 +12,7 @@ def start_consumer():
     while True:
         try:
             rabbit = RabbitMQ()
-            rabbit.start_consumer('core_file_status', callback_text_ai)
+            rabbit.start_consumer('service_A_queue', callback_text_ai)
         except pika.exceptions.AMQPConnectionError:
             print("Error connecting to queue")  # TODO: change print to save log
             time.sleep(5)
