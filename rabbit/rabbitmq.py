@@ -17,6 +17,7 @@ class RabbitMQ:
     def create_connection(self):
         """Create a RabbitMQ connection using pika."""
         if not self.connection or self.connection.is_closed:
+            print(f'{RABBIT_HOST=} {RABBIT_PORT=} {RABBIT_USER=} {RABBIT_PASSWORD=}')
             parameters = pika.ConnectionParameters(
                 host=RABBIT_HOST,
                 port=RABBIT_PORT,
@@ -40,6 +41,24 @@ class RabbitMQ:
                 properties=pika.BasicProperties(delivery_mode=2)
             )
             print(f"Sent {message} to queue {queue_name}")  # TODO: change print to save log
+        finally:
+            if channel.is_open:
+                channel.close()
+
+    def send_to_exchange(self, exchange_name, params):
+        """Send a message to a specified RabbitMQ exchange."""
+        try:
+            self.create_connection()  # Ensure connection is alive
+            channel = self.connection.channel()
+            channel.exchange_declare(exchange=exchange_name, exchange_type='fanout', durable=True)
+            message = json.dumps(params)
+            channel.basic_publish(
+                exchange=exchange_name,
+                routing_key='',
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            print(f"Sent {message} to exchange {exchange_name}")  # TODO: change print to save log
         finally:
             if channel.is_open:
                 channel.close()
