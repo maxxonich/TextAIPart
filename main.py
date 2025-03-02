@@ -73,7 +73,7 @@ def sentiment_endpoint(query: QueryRequest):
     return QueryResponse(id=query.id, result=result_text)
 
 
-@app.post("/prorussian", response_model=QueryResponse)
+@app.post("/prorussian", response_model=QueryResponse, deprecated=True)
 def prorussian_endpoint(query: QueryRequest):
     prompt = (
         f"Пожалуйста, проанализируй следующий текст и определи, содержит ли он элементы пророссийской пропаганды:\n\n"
