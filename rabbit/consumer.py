@@ -1,5 +1,6 @@
 from rabbit.rabbitmq import RabbitMQ
 from rabbit.callbacks import callback_text_ai
+from config import COMMENT_HANDLER_QUEUE
 
 import time, pika
 
@@ -12,7 +13,7 @@ def start_consumer():
     while True:
         try:
             rabbit = RabbitMQ()
-            rabbit.start_consumer('service_A_queue', callback_text_ai)
+            rabbit.start_consumer(COMMENT_HANDLER_QUEUE, callback_text_ai)
         except pika.exceptions.AMQPConnectionError:
             print("Error connecting to queue")  # TODO: change print to save log
             time.sleep(5)
