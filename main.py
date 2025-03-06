@@ -1,17 +1,18 @@
 import os
+import requests
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-# Импорт подключения к БД и моделей
+# Database connection and models import
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
 from models import QueryRequest, QueryResponse
 
-# Загружаем переменные окружения из .env
+# Load environment variables from .env
 load_dotenv()
 
-# Инициализация клиента Azure OpenAI
+# Initialize the Azure OpenAI client
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
@@ -19,8 +20,9 @@ client = AzureOpenAI(
 )
 
 deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "REPLACE_WITH_YOUR_DEPLOYMENT_NAME")
+ollama_url = "http://localhost:11434/api/generate"  # Ollama local API
 
-# Создаем таблицы в БД, если их ещё нет
+# Create database tables if they do not exist yet
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -28,36 +30,61 @@ app = FastAPI()
 
 def get_or_create_query_result(db, query: QueryRequest):
     """
-    Если запись с данным id уже существует, возвращаем её,
-    иначе создаем новую запись с исходным текстом.
+    If a record with the given ID already exists, return it.
+    Otherwise, create a new record with the original text.
     """
     record = db.query(QueryResult).filter(QueryResult.id == query.id).first()
     if not record:
         record = QueryResult(id=query.id, original_text=query.text)
         db.add(record)
-    else:
-        # Если необходимо обновлять исходный текст, можно раскомментировать:
-        # record.original_text = query.text
-        pass
     return record
 
 
-@app.post("/sentiment", response_model=QueryResponse)
-def sentiment_endpoint(query: QueryRequest):
-    prompt = (
-        f"Пожалуйста, проанализируй следующий текст и определи его эмоциональную тональность "
-        f"(позитивная, негативная или нейтральная):\n\n{query.text}"
-    )
+def query_azure(prompt: str) -> str:
+    """
+    Sends a prompt to Azure OpenAI and returns the response.
+    """
     try:
         response = client.completions.create(
             model=deployment_name,
             prompt=prompt,
-            max_tokens=50,
+            max_tokens=100,
             temperature=0.7
         )
-        result_text = response.choices[0].text.strip()
+        return response.choices[0].text.strip()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при обращении к Azure OpenAI: {e}")
+        raise HTTPException(status_code=500, detail=f"Azure OpenAI error: {e}")
+
+
+def query_ollama(prompt: str) -> str:
+    """
+    Sends a prompt to the local Ollama server and returns the response.
+    """
+    try:
+        response = requests.post(ollama_url, json={"model": "llama3.1", "prompt": prompt, "stream": False})
+        response.raise_for_status()
+        return response.json().get("response", "").strip()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Ollama server error: {e}")
+
+
+@app.post("/sentiment", response_model=QueryResponse)
+def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
+    """
+    Sentiment analysis. If `model="llama"`, it uses the local Ollama server.
+    Otherwise, it defaults to Azure OpenAI.
+    """
+    prompt = (
+        "Please determine the emotional tone of the text (positive, negative, or neutral). "
+        "Answer strictly with a single number without any explanations:\n"
+        "-1 for negative\n"
+        "0 for neutral\n"
+        "1 for positive\n\n"
+        f"Text:\n{query.text}\n\n"
+        "Answer:"
+    )
+
+    result_text = query_ollama(prompt) if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
@@ -66,38 +93,7 @@ def sentiment_endpoint(query: QueryRequest):
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка при сохранении в базу данных: {e}")
-    finally:
-        db.close()
-
-    return QueryResponse(id=query.id, result=result_text)
-
-
-@app.post("/prorussian", response_model=QueryResponse, deprecated=True)
-def prorussian_endpoint(query: QueryRequest):
-    prompt = (
-        f"Пожалуйста, проанализируй следующий текст и определи, содержит ли он элементы пророссийской пропаганды:\n\n"
-        f"{query.text}"
-    )
-    try:
-        response = client.completions.create(
-            model=deployment_name,
-            prompt=prompt,
-            max_tokens=50,
-            temperature=0.7
-        )
-        result_text = response.choices[0].text.strip()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при обращении к Azure OpenAI: {e}")
-
-    db = SessionLocal()
-    try:
-        record = get_or_create_query_result(db, query)
-        record.pro_russian_text = result_text
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка при сохранении в базу данных: {e}")
+        raise HTTPException(status_code=500, detail=f"Database save error: {e}")
     finally:
         db.close()
 
@@ -105,21 +101,17 @@ def prorussian_endpoint(query: QueryRequest):
 
 
 @app.post("/categories", response_model=QueryResponse)
-def categories_endpoint(query: QueryRequest):
+def categories_endpoint(query: QueryRequest, model: str = "azure"):
+    """
+    Category classification. If `model="llama"`, it uses the local Ollama server.
+    Otherwise, it defaults to Azure OpenAI.
+    """
     prompt = (
-        f"Пожалуйста, проанализируй следующий текст и выдели основные темы или категории, к которым он относится:\n\n"
+        "Please analyze the following text and identify the main topics or categories it pertains to:\n\n"
         f"{query.text}"
     )
-    try:
-        response = client.completions.create(
-            model=deployment_name,
-            prompt=prompt,
-            max_tokens=50,
-            temperature=0.7
-        )
-        result_text = response.choices[0].text.strip()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка при обращении к Azure OpenAI: {e}")
+
+    result_text = query_ollama(prompt) if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
@@ -128,7 +120,7 @@ def categories_endpoint(query: QueryRequest):
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка при сохранении в базу данных: {e}")
+        raise HTTPException(status_code=500, detail=f"Database save error: {e}")
     finally:
         db.close()
 
