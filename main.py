@@ -107,8 +107,23 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
     Otherwise, it defaults to Azure OpenAI.
     """
     prompt = (
-        "Please analyze the following text and identify the main topics or categories it pertains to:\n\n"
-        f"{query.text}"
+        "Identify which of the following possible categories best fits this text:\n\n"
+        "1) Politics\n"
+        "2) Technology\n"
+        "3) Entertainment\n"
+        "4) Sports\n"
+        "5) Science\n"
+        "6) Health\n"
+        "7) Ecology\n"
+        "8) Finance\n"
+        "9) Cars\n"
+        "10) Other\n\n"
+        "You can select multiple categories (up to three) if it is really justified. "
+        "If you are unsure, select 'Other'.\n\n"
+        "Return the result strictly in JSON array format (for example: [\"Technology\"] or [\"Sports\",\"Health\"]). "
+        "Do not add any additional text.\n\n"
+        f"Text:\n{query.text}\n\n"
+        "Answer:"
     )
 
     result_text = query_ollama(prompt) if model == "llama" else query_azure(prompt)
@@ -125,3 +140,4 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
         db.close()
 
     return QueryResponse(id=query.id, result=result_text)
+
