@@ -1,0 +1,10 @@
+*.pyc
+*.log
+*.dll
+*.lib
+*.exe
+*.pid
+.idea/
+.DS_Store
+.env
+/rabbitmq/data
