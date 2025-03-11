@@ -4,10 +4,10 @@ from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
-# Database connection and models import
+# Import database engine and models
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
-from models import QueryRequest, QueryResponse
+from models import QueryRequest, QueryResponse  # Assumes QueryRequest includes fields: ucid, text, service
 
 # Load environment variables from .env
 load_dotenv()
@@ -20,8 +20,7 @@ client = AzureOpenAI(
 )
 
 deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "REPLACE_WITH_YOUR_DEPLOYMENT_NAME")
-ollama_url = "http://localhost:11434/api/generate"  # Ollama local API
-
+ollama_url = "http://40.113.50.250:8080/llama/api/generate"  # Ollama local API
 # Create database tables if they do not exist yet
 Base.metadata.create_all(bind=engine)
 
@@ -30,19 +29,19 @@ app = FastAPI()
 
 def get_or_create_query_result(db, query: QueryRequest):
     """
-    If a record with the given ID already exists, return it.
-    Otherwise, create a new record with the original text.
+    If a record with the given ucid already exists, return it.
+    Otherwise, create a new record with the provided ucid, text, and service.
     """
-    record = db.query(QueryResult).filter(QueryResult.id == query.id).first()
+    record = db.query(QueryResult).filter(QueryResult.ucid == query.ucid).first()
     if not record:
-        record = QueryResult(id=query.id, original_text=query.text)
+        record = QueryResult(ucid=query.ucid, text=query.text, service=query.service)
         db.add(record)
     return record
 
 
 def query_azure(prompt: str) -> str:
     """
-    Sends a prompt to Azure OpenAI and returns the response.
+    Sends a prompt to Azure OpenAI and returns the result.
     """
     try:
         response = client.completions.create(
@@ -58,7 +57,7 @@ def query_azure(prompt: str) -> str:
 
 def query_ollama(prompt: str) -> str:
     """
-    Sends a prompt to the local Ollama server and returns the response.
+    Sends a prompt to the local Ollama server and returns the result.
     """
     try:
         response = requests.post(ollama_url, json={"model": "llama3.1", "prompt": prompt, "stream": False})
@@ -71,8 +70,9 @@ def query_ollama(prompt: str) -> str:
 @app.post("/sentiment", response_model=QueryResponse)
 def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
     """
-    Sentiment analysis. If `model="llama"`, it uses the local Ollama server.
-    Otherwise, it defaults to Azure OpenAI.
+    Performs sentiment analysis on the text.
+    If the 'model' parameter is set to "llama", the local Ollama server is used,
+    otherwise Azure OpenAI is used.
     """
     prompt = (
         "Please determine the emotional tone of the text (positive, negative, or neutral). "
@@ -97,14 +97,15 @@ def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
     finally:
         db.close()
 
-    return QueryResponse(id=query.id, result=result_text)
+    return QueryResponse(ucid=query.ucid, result=result_text)
 
 
 @app.post("/categories", response_model=QueryResponse)
 def categories_endpoint(query: QueryRequest, model: str = "azure"):
     """
-    Category classification. If `model="llama"`, it uses the local Ollama server.
-    Otherwise, it defaults to Azure OpenAI.
+    Performs category classification on the text.
+    If the 'model' parameter is set to "llama", the local Ollama server is used,
+    otherwise Azure OpenAI is used.
     """
     prompt = (
         "Identify which of the following possible categories best fits this text:\n\n"
@@ -131,7 +132,7 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
     db = SessionLocal()
     try:
         record = get_or_create_query_result(db, query)
-        record.categories = result_text
+        record.category = result_text
         db.commit()
     except Exception as e:
         db.rollback()
@@ -139,5 +140,4 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
     finally:
         db.close()
 
-    return QueryResponse(id=query.id, result=result_text)
-
+    return QueryResponse(ucid=query.ucid, result=result_text)
