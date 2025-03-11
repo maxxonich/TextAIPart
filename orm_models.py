@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Text
+from sqlalchemy import Column, String, Text, DateTime
 from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -11,3 +12,4 @@ class QueryResult(Base):
     service = Column(String, nullable=False)
     sentiment = Column(Text, nullable=True)
     category = Column(Text, nullable=True)
+    ts = Column(DateTime, nullable=False, default=datetime.utcnow)  # Timestamp field
