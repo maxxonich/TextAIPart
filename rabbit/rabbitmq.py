@@ -72,6 +72,19 @@ class RabbitMQ:
         print(f"Starting consumer for queue {queue_name}")  # TODO: change print to save log
         channel.start_consuming()
 
+    def start_multiple_consumers(self, consumers):
+        """
+        consumers: список кортежей (queue_name, callback)
+        Регистрирует несколько очередей и запускает start_consuming() один раз.
+        """
+        self.create_connection()
+        channel = self.connection.channel()
+        for queue_name, callback in consumers:
+            channel.queue_declare(queue=queue_name, durable=True, arguments=self.QUEUE_DECLARE_ARGS)
+            channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
+            print(f"Starting consumer for queue {queue_name}")
+        channel.start_consuming()
+
     def close_connection(self):
         """Safely close the RabbitMQ connection."""
         if self.connection and not self.connection.is_closed:
