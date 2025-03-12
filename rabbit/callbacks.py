@@ -1,4 +1,5 @@
 import json
+from rabbit.rabbitmq import RabbitMQ
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
 from models import QueryRequest, QueryResponse
