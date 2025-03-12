@@ -105,9 +105,9 @@ def callback_video_ocr(ch, method, properties, body):
             "service": service,
         }
         print(message)
-        message_json = json.dumps(message)
+        #message_json = json.dumps(message)
         rabbit = RabbitMQ()
-        rabbit.send_to_queue("text_ai_to_analyze", message_json)
+        rabbit.send_to_queue("text_ai_to_analyze", message)
 
     except Exception as e:
         print(f'error callback_video_ocr: {e}')
@@ -134,9 +134,9 @@ def callback_video_text_extraction(ch, method, properties, body):
             "service": service,
         }
         print(message)
-        message_json = json.dumps(message)
+        #message_json = json.dumps(message)
         rabbit = RabbitMQ()
-        rabbit.send_to_queue("text_ai_to_analyze", message_json)
+        rabbit.send_to_queue("text_ai_to_analyze", message)
 
     except Exception as e:
         print(f'error callback_video_text_extraction: {e}')
