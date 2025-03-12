@@ -89,7 +89,7 @@ def callback_video_ocr(ch, method, properties, body):
         data = json.loads(body)
         print(data)   # stub
         # TODO:logger.info...
-        ucid = data['ucid']
+        ucid = data['UCID']
         text = data['text']
         service = 'video_ocr'
         print(ucid, text, service)
@@ -118,7 +118,7 @@ def callback_video_text_extraction(ch, method, properties, body):
         data = json.loads(body)
         print(data)   # stub
         # TODO:logger.info...
-        ucid = data['ucid']
+        ucid = data['UCID']
         text = data['text']
         service = 'video_text_extraction'
         print(ucid, text, service)
