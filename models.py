@@ -2,10 +2,11 @@ from pydantic import BaseModel
 
 
 class QueryRequest(BaseModel):
-    id: str
+    ucid: str
     text: str
+    service: str
 
 
 class QueryResponse(BaseModel):
-    id: str
+    ucid: str
     result: str
