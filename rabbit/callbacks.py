@@ -2,6 +2,7 @@ import json
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
 from models import QueryRequest, QueryResponse
+import requests
 
 prompt_sentiment = (
     "Please determine the emotional tone of the text (positive, negative, or neutral). "
