@@ -79,7 +79,7 @@ def callback_text_ai(ch, method, properties, body):
         print(ucid, file_path)
 
     except Exception as e:
-        print(f'error callback_status_change: {e}')
+        print(f'error callback_text_ai: {e}')
         # TODO: logger.error(f'An error occurred: {e}')
 
 
@@ -108,7 +108,7 @@ def callback_video_ocr(ch, method, properties, body):
         rabbit.send_to_queue("text_ai_to_analyze", message_json)
 
     except Exception as e:
-        print(f'error callback_status_change: {e}')
+        print(f'error callback_video_ocr: {e}')
         # TODO: logger.error(f'An error occurred: {e}')
 
 
@@ -137,5 +137,5 @@ def callback_video_text_extraction(ch, method, properties, body):
         rabbit.send_to_queue("text_ai_to_analyze", message_json)
 
     except Exception as e:
-        print(f'error callback_status_change: {e}')
+        print(f'error callback_video_text_extraction: {e}')
         # TODO: logger.error(f'An error occurred: {e}')
