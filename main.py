@@ -13,13 +13,13 @@ from models import QueryRequest, QueryResponse  # Assumes QueryRequest includes 
 load_dotenv()
 
 # Initialize the Azure OpenAI client
-client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-)
+#client = AzureOpenAI(
+#    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+#    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+#    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+#)
 
-deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "REPLACE_WITH_YOUR_DEPLOYMENT_NAME")
+#eployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "REPLACE_WITH_YOUR_DEPLOYMENT_NAME")
 ollama_url = "http://40.113.50.250:8080/llama/api/generate"  # Ollama local API
 # Create database tables if they do not exist yet
 Base.metadata.create_all(bind=engine)
@@ -39,20 +39,20 @@ def get_or_create_query_result(db, query: QueryRequest):
     return record
 
 
-def query_azure(prompt: str) -> str:
-    """
-    Sends a prompt to Azure OpenAI and returns the result.
-    """
-    try:
-        response = client.completions.create(
-            model=deployment_name,
-            prompt=prompt,
-            max_tokens=100,
-            temperature=0.7
-        )
-        return response.choices[0].text.strip()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Azure OpenAI error: {e}")
+#def query_azure(prompt: str) -> str:
+#    """
+#    Sends a prompt to Azure OpenAI and returns the result.
+#    """
+#    try:
+#        response = client.completions.create(
+#            model=deployment_name,
+#            prompt=prompt,
+#            max_tokens=100,
+#            temperature=0.7
+#        )
+#        return response.choices[0].text.strip()
+#    except Exception as e:
+#        raise HTTPException(status_code=500, detail=f"Azure OpenAI error: {e}")
 
 
 def query_ollama(prompt: str) -> str:
@@ -84,7 +84,7 @@ def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
         "Answer:"
     )
 
-    result_text = query_ollama(prompt) if model == "llama" else query_azure(prompt)
+    result_text = query_ollama(prompt) #if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
@@ -127,7 +127,7 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
         "Answer:"
     )
 
-    result_text = query_ollama(prompt) if model == "llama" else query_azure(prompt)
+    result_text = query_ollama(prompt) #if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
