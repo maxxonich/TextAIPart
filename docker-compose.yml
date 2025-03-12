@@ -13,6 +13,8 @@ services:
       - db
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - message-broker
 
   db:
     image: postgres:15
@@ -25,6 +27,8 @@ services:
       - "${EXTERNAL_PORT_DB}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - message-broker
 
   worker:
     build: .
