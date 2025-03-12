@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  app:
+  text_ai_app:
     build: .
     container_name: fastapi_app
     ports:
@@ -10,13 +10,13 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      - text_ai_db
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
       - message-broker
 
-  db:
+  text_ai_db:
     image: postgres:15
     container_name: postgres_db
     environment:
@@ -26,15 +26,15 @@ services:
     ports:
       - "${EXTERNAL_PORT_DB}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - text_ai_postgres_data:/var/lib/postgresql/data
     networks:
       - message-broker
 
-  worker:
+  text_ai_worker:
     build: .
     container_name: fastapi_worker
     depends_on:
-      - db
+      - text_ai_db
     env_file:
       - .env
     command: [ "python", "-m", "rabbit.consumer" ]
@@ -44,7 +44,7 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  postgres_data:
+  text_ai_postgres_data:
 
 networks:
   message-broker:
