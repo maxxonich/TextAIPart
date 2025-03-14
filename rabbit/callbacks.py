@@ -79,7 +79,7 @@ def get_or_create_query_result(db, ucid, service, text):
             category=category
         )
         db.add(record)
-        db.commit()
+        #db.commit()
     return record
 
 def callback_text_ai(ch, method, properties, body):
