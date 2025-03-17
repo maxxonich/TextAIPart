@@ -1,4 +1,6 @@
 import json
+from http.client import HTTPException
+
 from rabbit.rabbitmq import RabbitMQ
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
@@ -37,6 +39,7 @@ prompt_category = (
 
 ollama_url = "http://40.113.50.250:8080/llama/api/generate"
 
+
 def query_ollama(prompt: str) -> str:
     """
     Sends a prompt to the local Ollama server and returns the result.
@@ -47,6 +50,7 @@ def query_ollama(prompt: str) -> str:
         return response.json().get("response", "").strip()
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Ollama server error: {e}")
+
 
 def get_or_create_query_result(db, ucid, service, text):
     """
@@ -70,11 +74,10 @@ def get_or_create_query_result(db, ucid, service, text):
     return record
 
 
-
 def callback_text_ai(ch, method, properties, body):
     try:
         data = json.loads(body)
-        print(data)   # stub
+        print(data)  # stub
         # TODO:logger.info...
         ucid = data['UCID']
         file_path = data['VideoId']['file_name']
@@ -89,7 +92,7 @@ def callback_video_ocr(ch, method, properties, body):
     try:
         db = SessionLocal()
         data = json.loads(body)
-        print(data)   # stub
+        print(data)  # stub
         # TODO:logger.info...
         ucid = data['UCID']
         text = data['text']
@@ -118,11 +121,40 @@ def callback_video_text_extraction(ch, method, properties, body):
     try:
         db = SessionLocal()
         data = json.loads(body)
-        print(data)   # stub
+        print(data)  # stub
         # TODO:logger.info...
         ucid = data['UCID']
         text = data['text']
         service = 'video_text_extraction'
+        print(ucid, text, service)
+
+        record = get_or_create_query_result(db, ucid, service, text)
+
+        message = {
+            "UCID": ucid,
+            "sentiment": record.sentiment,
+            "category": record.category,
+            "service": service,
+        }
+        print(message)
+        #message_json = json.dumps(message)
+        rabbit = RabbitMQ()
+        rabbit.send_to_queue("text_ai_to_analyze", message)
+
+    except Exception as e:
+        print(f'error callback_video_text_extraction: {e}')
+        # TODO: logger.error(f'An error occurred: {e}')
+
+
+def callback_text_around(ch, method, properties, body):
+    try:
+        db = SessionLocal()
+        data = json.loads(body)
+        print(data)  # stub
+        # TODO:logger.info...
+        ucid = data['UCID']
+        text = data['text']
+        service = 'text_around'
         print(ucid, text, service)
 
         record = get_or_create_query_result(db, ucid, service, text)
