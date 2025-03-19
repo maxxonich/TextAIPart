@@ -43,6 +43,8 @@ def get_or_create_query_result(db, query: QueryRequest):
 
 
 
+
+
 #def query_azure(prompt: str) -> str:
 #    """
 #    Sends a prompt to Azure OpenAI and returns the result.
