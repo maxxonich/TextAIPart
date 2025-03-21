@@ -29,14 +29,20 @@ app = FastAPI()
 
 def get_or_create_query_result(db, query: QueryRequest):
     """
-    If a record with the given ucid already exists, return it.
+    If a record with the given ucid and service already exists, return it.
     Otherwise, create a new record with the provided ucid, text, and service.
     """
-    record = db.query(QueryResult).filter(QueryResult.ucid == query.ucid).first()
+    record = db.query(QueryResult).filter(
+        QueryResult.ucid == query.ucid,
+        QueryResult.service == query.service
+    ).first()
     if not record:
         record = QueryResult(ucid=query.ucid, text=query.text, service=query.service)
         db.add(record)
     return record
+
+
+
 
 
 #def query_azure(prompt: str) -> str:
