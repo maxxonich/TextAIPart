@@ -1,11 +1,16 @@
 import json
-from http.client import HTTPException
+import logging
+import requests
+from fastapi import HTTPException
 
 from rabbit.rabbitmq import RabbitMQ
 from db import engine, SessionLocal
 from orm_models import Base, QueryResult
 from models import QueryRequest, QueryResponse
-import requests
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 prompt_sentiment = (
     "Please determine the emotional tone of the text (positive, negative, or neutral). "
@@ -49,20 +54,30 @@ def query_ollama(prompt: str) -> str:
         response.raise_for_status()
         return response.json().get("response", "").strip()
     except requests.exceptions.RequestException as e:
+        logger.error(f"Ollama server error: {e}")
         raise HTTPException(status_code=500, detail=f"Ollama server error: {e}")
 
 
 def get_or_create_query_result(db, ucid, service, text):
     """
-    If a record with the given ucid already exists, return it.
+    If a record with the given ucid and service already exists, return it.
     Otherwise, create a new record with the provided ucid, text, and service.
     """
     record = db.query(QueryResult).filter(
         QueryResult.ucid == ucid, QueryResult.service == service
     ).first()
+
+    # If the record doesn't exist, we create one (and do sentiment/category analysis).
     if not record:
+        if not text or not text.strip():
+            logger.warning(
+                f"Empty or whitespace text received for UCID: {ucid} with service: {service}. Skipping processing."
+            )
+            return None
+
         sentiment = query_ollama(prompt_sentiment.format(text))
         category = query_ollama(prompt_category.format(text))
+
         record = QueryResult(
             ucid=ucid,
             text=text,
@@ -71,35 +86,51 @@ def get_or_create_query_result(db, ucid, service, text):
             category=category
         )
         db.add(record)
+
     return record
 
 
 def callback_text_ai(ch, method, properties, body):
+    """
+    Rabbit callback for some text AI queue (not fully implemented).
+    """
     try:
         data = json.loads(body)
-        print(data)  # stub
-        # TODO:logger.info...
-        ucid = data['UCID']
-        file_path = data['VideoId']['file_name']
-        print(ucid, file_path)
+        logger.info(f"Received data in callback_text_ai: {data}")
 
+        ucid = data.get('UCID')
+        video_id = data.get('VideoId', {})
+        file_path = video_id.get('file_name', '')
+
+        logger.info(f"UCID: {ucid}, File Path: {file_path}")
+        # Further processing...
     except Exception as e:
-        print(f'error callback_text_ai: {e}')
-        # TODO: logger.error(f'An error occurred: {e}')
+        logger.error(f"Error in callback_text_ai: {e}")
 
 
 def callback_video_ocr(ch, method, properties, body):
+    """
+    Rabbit callback for 'video_ocr' queue. Takes OCR text from a video,
+    runs sentiment/category analysis, and sends results to 'text_ai_to_analyze'.
+    """
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         data = json.loads(body)
-        print(data)  # stub
-        # TODO:logger.info...
-        ucid = data['UCID']
-        text = data['text']
+        logger.info(f"Received data in callback_video_ocr: {data}")
+
+        ucid = data.get('UCID')
+        text = data.get('text', '')
         service = 'video_ocr'
-        print(ucid, text, service)
+        logger.info(f"Processing UCID: {ucid}, Service: {service}")
+
+        if not text or not text.strip():
+            logger.warning(f"Empty or whitespace text for UCID: {ucid}. Skipping.")
+            return
 
         record = get_or_create_query_result(db, ucid, service, text)
+        if record is None:
+            logger.warning(f"Record not created for UCID: {ucid} in callback_video_ocr due to empty text.")
+            return
 
         message = {
             "UCID": ucid,
@@ -107,28 +138,38 @@ def callback_video_ocr(ch, method, properties, body):
             "category": record.category,
             "service": service,
         }
-        print(message)
-        #message_json = json.dumps(message)
+        logger.info(f"Sending message from callback_video_ocr: {message}")
+
         rabbit = RabbitMQ()
         rabbit.send_to_queue("text_ai_to_analyze", message)
-
     except Exception as e:
-        print(f'error callback_video_ocr: {e}')
-        # TODO: logger.error(f'An error occurred: {e}')
+        logger.error(f"Error in callback_video_ocr: {e}")
+    finally:
+        db.close()
 
 
 def callback_video_text_extraction(ch, method, properties, body):
+    """
+    Rabbit callback for 'video_text_extraction' queue. Similar to callback_video_ocr.
+    """
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         data = json.loads(body)
-        print(data)  # stub
-        # TODO:logger.info...
-        ucid = data['UCID']
-        text = data['text']
+        logger.info(f"Received data in callback_video_text_extraction: {data}")
+
+        ucid = data.get('UCID')
+        text = data.get('text', '')
         service = 'video_text_extraction'
-        print(ucid, text, service)
+        logger.info(f"Processing UCID: {ucid}, Service: {service}")
+
+        if not text or not text.strip():
+            logger.warning(f"Empty or whitespace text in callback_video_text_extraction for UCID: {ucid}. Skipping.")
+            return
 
         record = get_or_create_query_result(db, ucid, service, text)
+        if record is None:
+            logger.warning(f"Record not created for UCID: {ucid} in callback_video_text_extraction due to empty text.")
+            return
 
         message = {
             "UCID": ucid,
@@ -136,28 +177,39 @@ def callback_video_text_extraction(ch, method, properties, body):
             "category": record.category,
             "service": service,
         }
-        print(message)
-        #message_json = json.dumps(message)
+        logger.info(f"Sending message from callback_video_text_extraction: {message}")
+
         rabbit = RabbitMQ()
         rabbit.send_to_queue("text_ai_to_analyze", message)
-
     except Exception as e:
-        print(f'error callback_video_text_extraction: {e}')
-        # TODO: logger.error(f'An error occurred: {e}')
+        logger.error(f"Error in callback_video_text_extraction: {e}")
+    finally:
+        db.close()
 
 
 def callback_text_around(ch, method, properties, body):
+    """
+    Additional Rabbit callback for 'text_around' queue.
+    (Found in db_fixes snippet; merging it here with logging.)
+    """
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         data = json.loads(body)
-        print(data)  # stub
-        # TODO:logger.info...
-        ucid = data['UCID']
-        text = data['text']
+        logger.info(f"Received data in callback_text_around: {data}")
+
+        ucid = data.get('UCID')
+        text = data.get('text', '')
         service = 'text_around'
-        print(ucid, text, service)
+        logger.info(f"Processing UCID: {ucid}, Service: {service}")
+
+        if not text or not text.strip():
+            logger.warning(f"Empty or whitespace text in callback_text_around for UCID: {ucid}. Skipping.")
+            return
 
         record = get_or_create_query_result(db, ucid, service, text)
+        if record is None:
+            logger.warning(f"Record not created for UCID: {ucid} in callback_text_around due to empty text.")
+            return
 
         message = {
             "UCID": ucid,
@@ -165,11 +217,11 @@ def callback_text_around(ch, method, properties, body):
             "category": record.category,
             "service": service,
         }
-        print(message)
-        #message_json = json.dumps(message)
+        logger.info(f"Sending message from callback_text_around: {message}")
+
         rabbit = RabbitMQ()
         rabbit.send_to_queue("text_ai_to_analyze", message)
-
     except Exception as e:
-        print(f'error callback_video_text_extraction: {e}')
-        # TODO: logger.error(f'An error occurred: {e}')
+        logger.error(f"Error in callback_text_around: {e}")
+    finally:
+        db.close()
