@@ -80,6 +80,10 @@ def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
     If the 'model' parameter is set to "llama", the local Ollama server is used,
     otherwise Azure OpenAI is used.
     """
+    # Check if the text is empty or contains only whitespace
+    if not query.text or not query.text.strip():
+        raise HTTPException(status_code=400, detail="Input text is empty or whitespace.")
+
     prompt = (
         "Please determine the emotional tone of the text (positive, negative, or neutral). "
         "Answer strictly with a single number without any explanations:\n"
@@ -90,7 +94,7 @@ def sentiment_endpoint(query: QueryRequest, model: str = "azure"):
         "Answer:"
     )
 
-    result_text = query_ollama(prompt) #if model == "llama" else query_azure(prompt)
+    result_text = query_ollama(prompt)  # if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
@@ -113,6 +117,10 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
     If the 'model' parameter is set to "llama", the local Ollama server is used,
     otherwise Azure OpenAI is used.
     """
+    # Check if the text is empty or contains only whitespace
+    if not query.text or not query.text.strip():
+        raise HTTPException(status_code=400, detail="Input text is empty or whitespace.")
+
     prompt = (
         "Identify which of the following possible categories best fits this text:\n\n"
         "1) Politics\n"
@@ -133,7 +141,7 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
         "Answer:"
     )
 
-    result_text = query_ollama(prompt) #if model == "llama" else query_azure(prompt)
+    result_text = query_ollama(prompt)  # if model == "llama" else query_azure(prompt)
 
     db = SessionLocal()
     try:
@@ -147,3 +155,4 @@ def categories_endpoint(query: QueryRequest, model: str = "azure"):
         db.close()
 
     return QueryResponse(ucid=query.ucid, result=result_text)
+
